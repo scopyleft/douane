@@ -22,9 +22,11 @@ document.addEventListener('buttonclick', function (event) {
     round: round,
     breadcrumb: breadcrumb.join(','),
     action: button.name,
-    value: buttonValue
+    value: buttonValue,
+    amount: calculator.amount() || '',
+    shipping: calculator.shipping() || ''
   }
-  var trackingCode = templatize('{product}/{round}/{breadcrumb}/{action}:{value}', context)
+  var trackingCode = templatize('{product}/{round}/{breadcrumb}/{amount}+{shipping}/{action}:{value}', context)
   ga('send', 'event', 'calculator', 'click', trackingCode)
   if (!gcode && context) {
     console.debug(context)
@@ -130,24 +132,30 @@ function showPage (page) {
     footer.classList.remove('satisfaction')
   }
 
-  var customClickEvent = document.createEvent('CustomEvent')
-  ;[].forEach.call(document.querySelectorAll('a.button,button'), function (button) {
+  ;[].forEach.call(document.querySelectorAll('button:not([type=submit]),a.button'), function (button) {
     button.addEventListener('click', function (event) {
-      customClickEvent.initCustomEvent('buttonclick', true, true, button)
-      document.dispatchEvent(customClickEvent)
+      dispatchButtonClick(button)
     })
   })
+
   var customPageEvent = document.createEvent('CustomEvent')
   customPageEvent.initCustomEvent('showpage', true, true, page)
   document.dispatchEvent(customPageEvent)
+}
+
+function dispatchButtonClick(target) {
+  var customClickEvent = document.createEvent('CustomEvent')
+  customClickEvent.initCustomEvent('buttonclick', true, true, target)
+  document.dispatchEvent(customClickEvent)
 }
 
 function submitAmount (event) {
   event.preventDefault()
   var form = event.target
   calculator.setAmount(form.querySelector('[name=amount]').value)
+  dispatchButtonClick(form.querySelector('[type=submit]'))
   if (typeof(postSubmitAmount) !== 'undefined') postSubmitAmount(event)
-  document.location.href = event.target.action
+  document.location.href = form.action
 }
 
 function start () {

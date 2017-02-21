@@ -192,7 +192,9 @@
 
   function submitShipping (event) {
     event.preventDefault()
-    calculator.setShipping(event.target.shipping.value)
+    var form = event.target
+    calculator.setShipping(form.shipping.value)
+    dispatchButtonClick(form.querySelector('[type=submit]'))
     document.location.href = calculator.amount() <= 150
                            ? '#shipping-20' : '#shipping-20-frais-4'
   }
