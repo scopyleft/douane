@@ -22,9 +22,11 @@ document.addEventListener('buttonclick', function (event) {
     round: round,
     breadcrumb: breadcrumb.join(','),
     action: button.name,
-    value: buttonValue
+    value: buttonValue,
+    amount: calculator.amount() || '',
+    shipping: calculator.shipping() || ''
   }
-  var trackingCode = templatize('{product}/{round}/{breadcrumb}/{action}:{value}', context)
+  var trackingCode = templatize('{product}/{round}/{breadcrumb}/{amount}+{shipping}/{action}:{value}', context)
   ga('send', 'event', 'calculator', 'click', trackingCode)
   if (!gcode && context) {
     console.debug(context)
@@ -37,56 +39,57 @@ document.addEventListener('buttonclick', function (event) {
 
 var round = 0
 var breadcrumb = []
-var calculator = {
-  init: function () {
+var Calculator = function () {
+  this.init = function () {
     this._amount = 0
     this._shipping = 0
-  },
+  }
 
-  setAmount: function (value) {
+  this.setAmount = function (value) {
     this._amount = parseInt(value, 10)
-  },
+  }
 
-  amount: function () {
+  this.amount = function () {
     return this._amount
-  },
+  }
 
-  setShipping: function (value) {
+  this.setShipping = function (value) {
     this._shipping = parseInt(value, 10)
-  },
+  }
 
-  shipping: function () {
+  this.shipping = function () {
     return this._shipping
-  },
+  }
 
-  amountWithVAT: function () {
+  this.amountWithVAT = function () {
     return this.addPercentage(this.amount(), 20)
-  },
+  }
 
-  amountWithShipping: function () {
+  this.amountWithShipping = function () {
     return this.amount() + this.shipping()
-  },
+  }
 
-  amountWithShippingAndVAT: function () {
+  this.amountWithShippingAndVAT = function () {
     return this.addPercentage(this.amountWithShipping(), 20)
-  },
+  }
 
-  // fees (4%) are also subject to VAT (20%)
-  amountWithFees: function () {
-    var subtotal = this.addPercentage(this.amount(), 4)
+  // fees are also subject to VAT (20%)
+  this.amountWithFees = function (fees) {
+    var subtotal = this.addPercentage(this.amount(), fees)
     return this.addPercentage(subtotal, 20)
-  },
+  }
 
-  // shipping and fees (4%) are also subject to VAT (20%)
-  amountWithShippingAndFees: function () {
-    var subtotal = this.addPercentage(this.amountWithShipping(), 4)
+  // shipping and fees are also subject to VAT (20%)
+  this.amountWithShippingAndFees = function (fees) {
+    var subtotal = this.addPercentage(this.amountWithShipping(), fees)
     return this.addPercentage(subtotal, 20)
-  },
+  }
 
-  addPercentage: function (amount, percentage) {
+  this.addPercentage = function (amount, percentage) {
     return amount * (1 + (percentage / 100))
   }
 }
+var calculator = new Calculator()
 var container = document.querySelector('#container')
 var footer = document.querySelector('footer')
 
@@ -94,7 +97,11 @@ var footer = document.querySelector('footer')
 function templatize (str, context) {
   return str.replace(/{[\w.\+\s\(\)]*}/g, function (match) {
     var varName = match.substr(1, match.length - 2)
-    return context ? context[varName] : eval(varName)
+    try {
+      return context ? context[varName] : eval(varName)
+    } catch (ReferenceError) {
+      document.location.hash = 'accueil'
+    }
   })
 }
 
@@ -125,24 +132,30 @@ function showPage (page) {
     footer.classList.remove('satisfaction')
   }
 
-  var customClickEvent = document.createEvent('CustomEvent')
-  ;[].forEach.call(document.querySelectorAll('a.button,button'), function (button) {
+  ;[].forEach.call(document.querySelectorAll('button:not([type=submit]),a.button'), function (button) {
     button.addEventListener('click', function (event) {
-      customClickEvent.initCustomEvent('buttonclick', true, true, button)
-      document.dispatchEvent(customClickEvent)
+      dispatchButtonClick(button)
     })
   })
+
   var customPageEvent = document.createEvent('CustomEvent')
   customPageEvent.initCustomEvent('showpage', true, true, page)
   document.dispatchEvent(customPageEvent)
+}
+
+function dispatchButtonClick(target) {
+  var customClickEvent = document.createEvent('CustomEvent')
+  customClickEvent.initCustomEvent('buttonclick', true, true, target)
+  document.dispatchEvent(customClickEvent)
 }
 
 function submitAmount (event) {
   event.preventDefault()
   var form = event.target
   calculator.setAmount(form.querySelector('[name=amount]').value)
+  dispatchButtonClick(form.querySelector('[type=submit]'))
   if (typeof(postSubmitAmount) !== 'undefined') postSubmitAmount(event)
-  document.location.href = event.target.action
+  document.location.href = form.action
 }
 
 function start () {
